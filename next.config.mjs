@@ -2,7 +2,7 @@
 const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
-  output: "standalone",
+  output: "export",
   images: { unoptimized: true },
 };
 

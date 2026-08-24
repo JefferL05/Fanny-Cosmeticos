@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && opennextjs-cloudflare build --skipNextBuild && node scripts/prepare-dist.mjs",
+    "build": "next build && node scripts/prepare-dist.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
@@ -14,7 +14,6 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "1.20.2",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
