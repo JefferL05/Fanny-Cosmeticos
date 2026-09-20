@@ -30,11 +30,30 @@ Projeto Supabase: `ylcoubtyvfnoqmwkkmcn`, região São Paulo. Nenhuma tabela de 
 
 ## Banco e validação
 
-- Migração: `supabase/migrations/20260920134549_store_foundation.sql`.
+- Migrações: `supabase/migrations/20260920134549_store_foundation.sql` e `supabase/migrations/20260921090000_commerce_integrations.sql` (frete por estado, status de pagamento e catálogo administrável).
 - Seed explicitamente demonstrativo: `supabase/seed.sql` (não substitui dados existentes).
 - Testes transacionais: `supabase/tests/access_and_orders.sql`. Executar apenas no ambiente demonstrativo contendo os nove produtos originais. As fixtures são revertidas com ROLLBACK.
 - Funções privilegiadas ficam no schema privado e só são executadas por triggers; validam o usuário e nunca aceitam um preço do cliente.
 - Pedidos são limitados a cinco por usuário por minuto, com no máximo 30 itens distintos. O identificador do pedido evita duplicação em uma nova tentativa da mesma submissão.
+
+## Integrações desta etapa (sandbox)
+
+Estas integrações ficam prontas em código, desligadas por padrão até que os segredos sejam configurados no projeto Supabase (nunca no frontend):
+
+- **Frete por CEP**: o checkout consulta a API pública ViaCEP (sem chave) para descobrir o estado a partir do CEP. O preço do frete é calculado no banco pela tabela `public.shipping_zones` (uma tarifa demonstrativa por UF) dentro do mesmo gatilho `prepare_order`, então o navegador nunca decide o valor cobrado. Ajuste os valores de `shipping_zones` para tarifas reais (Correios/Melhor Envio) quando estiver pronto para produção.
+- **Pagamento (Mercado Pago, sandbox)**: `supabase/functions/create-payment-preference` cria uma preferência de Checkout Pro após o pedido ser salvo, e `supabase/functions/mercadopago-webhook` recebe a notificação e reconcilia `orders.payment_status` (`pending`/`paid`/`failed`/`refunded`) consultando a API do Mercado Pago (nunca confia no valor do webhook). Sem as credenciais configuradas, o checkout continua funcionando apenas como pedido de teste, sem cobrança.
+- **E-mail transacional (Resend)**: `supabase/functions/send-order-email` envia confirmação de pedido e de pagamento. Sem `RESEND_API_KEY`, a função responde `not_configured` e a loja segue funcionando normalmente.
+- **Catálogo administrativo**: administradores agora podem cadastrar novos produtos pelo painel (`Administrar → Novo produto`), além de ajustar estoque. Uma nova política de RLS (`admin_catalog_insert`) permite `insert` na tabela `products` somente para membros de `store_admins`.
+
+### Configurar as credenciais (quando tiver as contas)
+
+```sh
+supabase link --project-ref ylcoubtyvfnoqmwkkmcn
+supabase functions deploy create-payment-preference mercadopago-webhook send-order-email
+supabase secrets set --env-file supabase/functions/.env   # copie de supabase/functions/.env.example, nunca versione o .env real
+```
+
+Configure a URL de notificação do Mercado Pago (`.../functions/v1/mercadopago-webhook`) no aplicativo de sandbox e use um token de teste (`TEST-...`) até validar o fluxo ponta a ponta.
 
 ## Primeiro acesso administrativo
 
@@ -46,6 +65,6 @@ Projeto Supabase: `ylcoubtyvfnoqmwkkmcn`, região São Paulo. Nenhuma tabela de 
 
 ## Limites atuais
 
-**Ainda não é uma loja pronta para vendas reais.** Os nove produtos, preços e estoque são demonstrativos. Os pedidos têm status `demo`, não cobram, não reservam estoque e não geram entrega. Não há gateway, webhook, frete por CEP ou envio de newsletter. O formulário informa a indisponibilidade da newsletter sem fingir inscrição.
+**Ainda não é uma loja pronta para vendas reais.** Os nove produtos-base, preços e estoque seguem demonstrativos. Os pedidos continuam com status `demo` (não reservam estoque, não geram entrega), mas agora têm `payment_status` e podem ser pagos de verdade em sandbox se as credenciais do Mercado Pago forem configuradas — nenhuma cobrança de produção ocorre sem chaves de produção explícitas. Frete agora é calculado por estado (ainda tarifas demonstrativas, não uma cotação real de transportadora). Não há envio de newsletter; o formulário informa a indisponibilidade sem fingir inscrição.
 
-Antes do lançamento comercial: cadastrar produtos reais, configurar conta administrativa, confirmar fluxo de e-mail/SMTP, integrar pagamentos e frete, implementar reservas transacionais e expiração, políticas comerciais e privacidade. A publicação preserva o acesso restrito existente do Sites; liberar o público é uma ação separada.
+Antes do lançamento comercial: cadastrar produtos reais completos (o formulário do painel cobre os campos essenciais; dados como benefícios/ingredientes/lote ainda exigem o Table Editor do Supabase), trocar as credenciais de sandbox por chaves de produção do Mercado Pago e do Resend, contratar tarifas reais de frete (Correios/Melhor Envio) em vez da tabela demonstrativa por UF, implementar reservas transacionais e expiração de estoque, e revisar políticas comerciais e de privacidade. A publicação preserva o acesso restrito existente do Sites; liberar o público é uma ação separada.
