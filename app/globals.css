@@ -316,3 +316,14 @@ td:first-child small { display: block; margin-top: 3px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto!important; transition-duration: .01ms!important; animation-duration: .01ms!important; }
 }
+
+/* Integrated account and stock controls: fluid widths for mobile. */
+.account-panel { max-width: 30rem; }
+.account-form { display: grid; gap: 1rem; }
+.account-form label { display: grid; gap: .5rem; }
+.account-form input, .stock-form input { padding: .75rem; border: 1px solid #caaeb8; border-radius: .5rem; width: 100%; min-width: 0; }
+.stock-form { display: flex; gap: .5rem; align-items: center; }
+.stock-form input { width: 6rem; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.account-panel p, .success-state p { overflow-wrap: anywhere; }
+.inventory-card { margin-block: 1.5rem; }

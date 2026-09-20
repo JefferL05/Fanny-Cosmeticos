@@ -1,9 +1,44 @@
-import { products } from "@/lib/products";
+"use client";
+import { useEffect, useState } from "react";
+import type { Product } from "@/lib/types";
+import { loadProducts } from "@/lib/catalog";
+import { supabase } from "@/lib/supabase";
 
+type Order = { id: string; customer_name: string; total: number; created_at: string; status: string };
 export function InventoryPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [query, setQuery] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function refresh() {
+    setBusy(true);
+    try {
+      setProducts(await loadProducts());
+      const { data, error } = await supabase.from("orders").select("id,customer_name,total,created_at,status").order("created_at", { ascending: false }).limit(50);
+      if (error) throw error;
+      setOrders(data || []);
+    } catch { setMessage("Não foi possível carregar o painel. Confira sua sessão e tente novamente."); }
+    finally { setBusy(false); }
+  }
+  useEffect(() => { void refresh(); }, []);
+  async function updateStock(e: React.FormEvent<HTMLFormElement>, product: Product) {
+    e.preventDefault(); setMessage(""); setBusy(true);
+    const stock = Number(new FormData(e.currentTarget).get("stock"));
+    if (!Number.isInteger(stock) || stock < product.reserved) { setMessage("Quantidade inválida."); setBusy(false); return; }
+    try {
+      const { data, error } = await supabase.from("products").update({ stock }).eq("id", product.id).eq("stock", product.stock).select("id");
+      if (error || !data?.length) { setMessage("Não foi possível salvar. Confira sua permissão ou atualize o painel: o estoque pode ter mudado."); return; }
+      setMessage("Estoque atualizado e movimentação registrada."); await refresh();
+    } catch { setMessage("Falha de conexão. Atualize o painel antes de tentar novamente."); }
+    finally { setBusy(false); }
+  }
   if (!open) return null;
-  const physical = products.reduce((s, p) => s + p.stock, 0);
-  const reserved = products.reduce((s, p) => s + p.reserved, 0);
-  const low = products.filter(p => p.stock - p.reserved <= 5);
-  return <div className="admin-shell"><header className="admin-header"><div><span className="admin-logo">Fanny</span><span>Painel operacional · demonstração</span></div><button onClick={onClose}>Voltar à loja ×</button></header><main className="admin-main"><div className="admin-heading"><div><span className="eyebrow">Estoque e operação</span><h1>Visão geral</h1><p>Controle por SKU, reserva, lote e validade usando a regra FEFO.</p></div><button className="primary-button">+ Entrada de estoque</button></div><div className="stat-grid"><article><span>SKUs ativos</span><strong>{products.length}</strong><small>catálogo demonstrativo</small></article><article><span>Estoque físico</span><strong>{physical}</strong><small>unidades totais</small></article><article><span>Reservado</span><strong>{reserved}</strong><small>checkout e pedidos</small></article><article className="warning"><span>Estoque baixo</span><strong>{low.length}</strong><small>requer atenção</small></article></div><section className="inventory-card"><div className="inventory-title"><div><h2>Posição de estoque</h2><p>Disponível = físico − reservado − bloqueado.</p></div><input placeholder="Buscar SKU ou produto" aria-label="Buscar no estoque" /></div><div className="table-wrap"><table><thead><tr><th>Produto</th><th>SKU</th><th>Físico</th><th>Reservado</th><th>Disponível</th><th>Lote</th><th>Validade</th><th>Status</th></tr></thead><tbody>{products.map(p => { const available = p.stock - p.reserved; return <tr key={p.id}><td><strong>{p.name}</strong><small>{p.brand}</small></td><td>{p.sku}</td><td>{p.stock}</td><td>{p.reserved}</td><td><strong>{available}</strong></td><td>{p.lot}</td><td>{new Date(p.expiresAt).toLocaleDateString("pt-BR")}</td><td><span className={`stock-status ${available <= 5 ? "low" : "ok"}`}>{available <= 5 ? "Baixo" : "Saudável"}</span></td></tr>})}</tbody></table></div></section><section className="admin-bottom"><article><span className="eyebrow">Reposição sugerida</span><h2>{low.length} itens abaixo do nível confortável</h2><p>Crie um pedido de compra para evitar indisponibilidade dos produtos mais procurados.</p><button>Revisar sugestões →</button></article><article><span className="eyebrow">Boas práticas</span><h2>Sem estoque negativo</h2><p>Reservas devem ser transacionais, expirar automaticamente e gerar movimentações auditáveis.</p></article></section></main></div>;
+  const filtered = products.filter(p => `${p.name} ${p.sku}`.toLowerCase().includes(query.toLowerCase()));
+  return <div className="admin-shell"><header className="admin-header"><div><span className="admin-logo">Fanny</span><span>Administração</span></div><button onClick={onClose}>Voltar à loja ×</button></header>
+    <main className="admin-main"><h1>Estoque e pedidos</h1><p>Catálogo demonstrativo. Ajustes de estoque ficam registrados para auditoria.</p><p role="status">{busy ? "Atualizando…" : message}</p>
+      <section className="inventory-card"><div className="inventory-title"><h2>Estoque</h2><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar SKU ou produto" aria-label="Buscar no estoque"/><button disabled={busy} onClick={() => void refresh()}>Atualizar</button></div>
+      <div className="table-wrap"><table><thead><tr><th>Produto</th><th>SKU</th><th>Físico</th><th>Reservado</th><th>Disponível</th><th>Ajustar estoque físico</th></tr></thead><tbody>{filtered.map(p => <tr key={p.id}><td>{p.name}</td><td>{p.sku}</td><td>{p.stock}</td><td>{p.reserved}</td><td>{p.stock-p.reserved}</td><td><form className="stock-form" onSubmit={e => void updateStock(e,p)}><input key={`${p.id}-${p.stock}`} name="stock" type="number" min={p.reserved} max={1000000} step="1" defaultValue={p.stock} aria-label={`Estoque de ${p.name}`} required/><button disabled={busy}>Salvar</button></form></td></tr>)}</tbody></table></div></section>
+      <section className="inventory-card"><h2>Últimos pedidos de teste</h2><p>Não houve cobrança nem reserva de estoque.</p>{orders.length ? <div className="table-wrap"><table><thead><tr><th>Pedido</th><th>Cliente</th><th>Estimativa</th><th>Data</th></tr></thead><tbody>{orders.map(o => <tr key={o.id}><td>{o.id}</td><td>{o.customer_name}</td><td>{new Intl.NumberFormat("pt-BR", { style:"currency", currency:"BRL" }).format(o.total)}</td><td>{new Date(o.created_at).toLocaleString("pt-BR")}</td></tr>)}</tbody></table></div> : <p>Nenhum pedido registrado.</p>}</section>
+    </main></div>;
 }

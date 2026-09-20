@@ -1,40 +1,51 @@
 # Fanny Cosméticos
 
-MVP funcional de e-commerce de cosméticos coreanos, desenvolvido em Next.js, React e TypeScript.
+Loja Next.js/React/TypeScript integrada a um projeto Supabase exclusivo. Hospedagem atual: Sites; exportação estática também compatível com Vercel.
 
-## Incluído
+## Funcionalidades desta etapa
 
-- Vitrine responsiva com identidade original em rosa suave;
-- Busca e filtros por categoria;
-- Produto detalhado;
-- Carrinho persistente em `localStorage`;
-- Frete grátis progressivo;
-- Checkout demonstrativo com PIX, cartão e boleto;
-- Newsletter demonstrativa;
-- Painel de estoque com SKU, reservas, lotes e validades;
-- Dados fictícios e avisos regulatórios;
-- SEO básico, acessibilidade e layout mobile.
+- Catálogo carregado do Supabase, com carregamento, erro e nova tentativa.
+- Cadastro e login por e-mail/senha com Supabase Auth.
+- Carrinho local contendo apenas identificadores e quantidades; os preços são reconsultados.
+- Pedidos de **teste** persistidos por cliente. O banco calcula preços e frete, valida disponibilidade e impede alteração de totais pelo navegador.
+- Painel restrito a membros de `store_admins`, atualização de estoque com controle de concorrência e trilha de auditoria.
+- Políticas RLS em todas as tabelas públicas. Nenhuma chave privilegiada no navegador.
 
-## Executar localmente
+## Desenvolvimento
 
-```bash
-npm install
+```sh
+npm ci
 npm run dev
+npm run typecheck
+npm run build
 ```
 
-Acesse `http://localhost:3000`.
+O build gera `out/` e o pacote Worker compatível em `dist/`. `next start` não serve uma exportação estática; use um servidor estático sobre `out/` para pré-visualizar o build.
 
-## Escopo deste MVP
+## Configuração
 
-Pagamentos, frete, autenticação e banco de dados estão representados na interface, mas não realizam operações reais. Para produção, conecte a aplicação a uma API modular, PostgreSQL, Redis e gateways por adaptadores server-side.
+Veja `.env.example`. Somente a URL e a chave **publishable** podem ser expostas ao navegador. Os valores públicos do projeto atual estão definidos como padrão em `lib/supabase.ts`; variáveis `NEXT_PUBLIC_*` permitem apontar outra instalação no build. Nunca inserir `service_role`, senha de banco ou chaves de pagamento no frontend.
 
-## Evolução recomendada
+Projeto Supabase: `ylcoubtyvfnoqmwkkmcn`, região São Paulo. Nenhuma tabela de outro projeto foi alterada.
 
-1. Módulos `catalog`, `inventory`, `cart`, `checkout`, `orders`, `payments` e `shipping` no backend.
-2. PostgreSQL com movimentações de estoque e reservas transacionais.
-3. Webhooks idempotentes para PIX/cartão.
-4. Integração de frete por CEP.
-5. Autenticação e RBAC no painel administrativo.
-6. Auditoria, observabilidade, backups e testes E2E.
+## Banco e validação
 
-Todos os produtos, marcas, preços, avaliações e alegações presentes no seed são demonstrativos.
+- Migração: `supabase/migrations/20260920134549_store_foundation.sql`.
+- Seed explicitamente demonstrativo: `supabase/seed.sql` (não substitui dados existentes).
+- Testes transacionais: `supabase/tests/access_and_orders.sql`. Executar apenas no ambiente demonstrativo contendo os nove produtos originais. As fixtures são revertidas com ROLLBACK.
+- Funções privilegiadas ficam no schema privado e só são executadas por triggers; validam o usuário e nunca aceitam um preço do cliente.
+- Pedidos são limitados a cinco por usuário por minuto, com no máximo 30 itens distintos. O identificador do pedido evita duplicação em uma nova tentativa da mesma submissão.
+
+## Primeiro acesso administrativo
+
+1. Em Supabase → Authentication → URL Configuration, definir Site URL e Redirect URLs para o endereço publicado da loja.
+2. Configurar SMTP próprio antes de liberar cadastros externos: o envio padrão tem restrições e não substitui um serviço de e-mail de produção.
+3. Criar uma conta na loja e confirmar o e-mail, ou criar a conta pelo painel Authentication do Supabase.
+4. Depois de verificar o UUID da conta correta, inserir esse UUID em `public.store_admins` pelo Table Editor do Supabase. Não conceder acesso com `user_metadata` e não criar uma política de autoatribuição de administrador.
+5. Sair e entrar novamente: o botão Administrar ficará disponível.
+
+## Limites atuais
+
+**Ainda não é uma loja pronta para vendas reais.** Os nove produtos, preços e estoque são demonstrativos. Os pedidos têm status `demo`, não cobram, não reservam estoque e não geram entrega. Não há gateway, webhook, frete por CEP ou envio de newsletter. O formulário informa a indisponibilidade da newsletter sem fingir inscrição.
+
+Antes do lançamento comercial: cadastrar produtos reais, configurar conta administrativa, confirmar fluxo de e-mail/SMTP, integrar pagamentos e frete, implementar reservas transacionais e expiração, políticas comerciais e privacidade. A publicação preserva o acesso restrito existente do Sites; liberar o público é uma ação separada.
