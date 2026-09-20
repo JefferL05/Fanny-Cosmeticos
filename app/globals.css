@@ -327,3 +327,13 @@ td:first-child small { display: block; margin-top: 3px; color: var(--muted); }
 button:disabled { opacity: .55; cursor: not-allowed; }
 .account-panel p, .success-state p { overflow-wrap: anywhere; }
 .inventory-card { margin-block: 1.5rem; }
+
+/* Account actions remain visible when category navigation is hidden. */
+.site-header { height: auto; min-height: 5.125rem; flex-wrap: wrap; gap: .75rem 1.25rem; padding-block: .75rem; }
+.account-actions { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+.account-actions button { min-height: 2.75rem; padding: .5rem .875rem; border: 1px solid var(--rose-600); border-radius: .75rem; background: white; color: var(--rose-600); font: inherit; font-size: .875rem; cursor: pointer; }
+.account-actions button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+@media (max-width: 780px) {
+  .site-header { min-height: 4.375rem; gap: .5rem; padding: .625rem 1rem; }
+  .account-actions { order: 3; flex-basis: 100%; justify-content: flex-end; flex-wrap: wrap; }
+}
